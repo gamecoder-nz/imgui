@@ -527,6 +527,11 @@ bool ImGui_ImplSDL2_InitForVulkan(SDL_Window* window)
     return true;
 }
 
+bool ImGui_ImplSDL2_InitForBGFX(SDL_Window* window)
+{
+    return ImGui_ImplSDL2_Init(window, nullptr, nullptr);
+}
+
 bool ImGui_ImplSDL2_InitForD3D(SDL_Window* window)
 {
 #if !defined(_WIN32)
