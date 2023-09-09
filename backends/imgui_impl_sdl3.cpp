@@ -29,6 +29,7 @@
 //  2023-02-07: Forked "imgui_impl_sdl2" into "imgui_impl_sdl3". Removed version checks for old feature. Refer to imgui_impl_sdl2.cpp for older changelog.
 
 #include "imgui.h"
+#ifndef IMGUI_DISABLE
 #include "imgui_impl_sdl3.h"
 
 // Clang warnings with -Weverything
@@ -470,6 +471,11 @@ bool ImGui_ImplSDL3_InitForMetal(SDL_Window* window)
 bool ImGui_ImplSDL3_InitForSDLRenderer(SDL_Window* window, SDL_Renderer* renderer)
 {
     return ImGui_ImplSDL3_Init(window, renderer, nullptr);
+}
+
+bool ImGui_ImplSDL3_InitForOther(SDL_Window* window)
+{
+    return ImGui_ImplSDL3_Init(window, nullptr, nullptr);
 }
 
 void ImGui_ImplSDL3_Shutdown()
@@ -944,6 +950,10 @@ static void ImGui_ImplSDL3_ShutdownPlatformInterface()
     ImGui::DestroyPlatformWindows();
 }
 
+//-----------------------------------------------------------------------------
+
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #endif
+
+#endif // #ifndef IMGUI_DISABLE
