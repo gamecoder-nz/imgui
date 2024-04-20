@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.23)
 project(Imgui)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
 file(GLOB SRC *.h *.cpp backends/imgui_impl_bgfx.h backends/imgui_impl_bgfx.cpp backends/imgui_impl_sdl.h backends/imgui_impl_sdl.cpp misc/cpp/imgui_stdlib.cpp)
 
 add_library(Imgui ${SRC})
