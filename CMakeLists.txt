@@ -6,17 +6,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CONFIGURATION_TYPES Debug;Release)
 
 file(GLOB SRC *.cpp)
-file(GLOB BACKEND_SRC backends/imgui_impl_bgfx.cpp backends/imgui_impl_sdl3.cpp)
+file(GLOB BACKEND_SRC backends/imgui_impl_bgfx.cpp backends/imgui_impl_sdl3.cpp misc/cpp/imgui_stdlib.cpp)
 
 add_library(Imgui ${SRC} ${BACKEND_SRC})
 
 include_directories(./)
-include_directories(../bgfx/include)
-include_directories(../bx/include)
+include_directories(../bgfx/bgfx/include)
+include_directories(../bgfx/bx/include)
 include_directories(../sdl/include)
 
 if(MSVC)
-    include_directories(../bx/include/compat/msvc)
+    include_directories(../bgfx/bx/include/compat/msvc)
     target_compile_options(Imgui PUBLIC "/Zc:__cplusplus")
 endif()
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DBX_CONFIG_DEBUG=1")
