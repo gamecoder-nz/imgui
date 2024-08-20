@@ -1270,6 +1270,11 @@ bool ImGui_ImplBgfx_CreateDeviceObjects()
 void ImGui_ImplBgfx_DestroyDeviceObjects()
 {
     ImGui_ImplBgfx_DestroyFontsTexture();
+    ImGui_ImplBgfx_Data* bd = ImGui_ImplBgfx_GetBackendData();
+    bgfx::destroy(bd->Program);
+    bgfx::destroy(bd->ImageLodEnabled);
+    bgfx::destroy(bd->ImageProgram);
+    bgfx::destroy(bd->TextureSampler);
 }
 
 namespace ImGui
