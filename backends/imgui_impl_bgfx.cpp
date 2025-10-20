@@ -1145,9 +1145,9 @@ void ImGui_ImplBgfx_RenderDrawData(ImDrawData* draw_data)
                 bgfx::TextureHandle th = bd->FontTexture;
                 bgfx::ProgramHandle program = bd->Program;
 
-                if (NULL != cmd->TextureId)
+                if (NULL != cmd->GetTexID())
                 {
-                    union { ImTextureID ptr; struct { bgfx::TextureHandle handle; uint8_t flags; uint8_t mip; } s; } texture = { cmd->TextureId };
+                    union { ImTextureID ptr; struct { bgfx::TextureHandle handle; uint8_t flags; uint8_t mip; } s; } texture = { cmd->GetTexID() };
 
                     state |= 0 != (IMGUI_FLAGS_ALPHA_BLEND & texture.s.flags)
                         ? BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA)
