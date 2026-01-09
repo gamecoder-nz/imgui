@@ -1075,12 +1075,78 @@ void ImGui_ImplBgfx_NewFrame()
 void ImGui_ImplBgfx_RenderDrawData(ImDrawData* draw_data)
 {
     ImGui_ImplBgfx_Data* bd = ImGui_ImplBgfx_GetBackendData();
+    if (NULL != draw_data->Textures)
+    {
+        for (ImTextureData* texData : *draw_data->Textures)
+        {
+            switch (texData->Status)
+            {
+            case ImTextureStatus_WantCreate:
+            {
+                ImGui::TextureBgfx tex =
+                {
+                    .handle = bgfx::createTexture2D(
+                          (uint16_t)texData->Width
+                        , (uint16_t)texData->Height
+                        , false
+                        , 1
+                        , bgfx::TextureFormat::BGRA8
+                        , 0
+                        ),
+                    .flags = IMGUI_FLAGS_ALPHA_BLEND,
+                    .mip = 0,
+                    .unused = 0,
+                };
+
+                bgfx::setName(tex.handle, "ImGui Font Atlas");
+                bgfx::updateTexture2D(tex.handle, 0, 0, 0, 0
+                    , bx::narrowCast<uint16_t>(texData->Width)
+                    , bx::narrowCast<uint16_t>(texData->Height)
+                    , bgfx::copy(texData->GetPixels(), texData->GetSizeInBytes())
+                );
+
+                texData->SetTexID(bx::bitCast<ImTextureID>(tex));
+                texData->SetStatus(ImTextureStatus_OK);
+            }
+            break;
+
+            case ImTextureStatus_WantDestroy:
+            {
+                ImGui::TextureBgfx tex = bx::bitCast<ImGui::TextureBgfx>(texData->GetTexID());
+                bgfx::destroy(tex.handle);
+                texData->SetTexID(ImTextureID_Invalid);
+                texData->SetStatus(ImTextureStatus_Destroyed);
+            }
+            break;
+
+            case ImTextureStatus_WantUpdates:
+            {
+                ImGui::TextureBgfx tex = bx::bitCast<ImGui::TextureBgfx>(texData->GetTexID());
+
+                for (ImTextureRect& rect : texData->Updates)
+                {
+                    const uint32_t bpp = texData->BytesPerPixel;
+                    const bgfx::Memory* pix = bgfx::alloc(rect.h * rect.w * bpp);
+                    bx::gather(pix->data, texData->GetPixelsAt(rect.x, rect.y), texData->GetPitch(), rect.w * bpp, rect.h);
+                    bgfx::updateTexture2D(tex.handle, 0, 0, rect.x, rect.y, rect.w, rect.h, pix);
+                }
+            }
+            break;
+
+            default:
+                break;
+            }
+        }
+    }
 
     // Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates != framebuffer coordinates)
-    int fb_width = (int)(draw_data->DisplaySize.x * draw_data->FramebufferScale.x);
-    int fb_height = (int)(draw_data->DisplaySize.y * draw_data->FramebufferScale.y);
-    if (fb_width <= 0 || fb_height <= 0)
+    int32_t dispWidth = int32_t(draw_data->DisplaySize.x * draw_data->FramebufferScale.x);
+    int32_t dispHeight = int32_t(draw_data->DisplaySize.y * draw_data->FramebufferScale.y);
+    if (dispWidth <= 0
+        || dispHeight <= 0)
+    {
         return;
+    }
 
     bgfx::setViewName(bd->ViewId, "ImGui");
     bgfx::setViewMode(bd->ViewId, bgfx::ViewMode::Sequential);
@@ -1142,21 +1208,24 @@ void ImGui_ImplBgfx_RenderDrawData(ImDrawData* draw_data)
                     | BGFX_STATE_MSAA
                     ;
 
-                bgfx::TextureHandle th = bd->FontTexture;
+                bgfx::TextureHandle th = BGFX_INVALID_HANDLE;
                 bgfx::ProgramHandle program = bd->Program;
 
-                if (NULL != cmd->GetTexID())
-                {
-                    union { ImTextureID ptr; struct { bgfx::TextureHandle handle; uint8_t flags; uint8_t mip; } s; } texture = { cmd->GetTexID() };
+                const ImTextureID texId = cmd->GetTexID();
 
-                    state |= 0 != (IMGUI_FLAGS_ALPHA_BLEND & texture.s.flags)
+                if (ImTextureID_Invalid != texId)
+                {
+                    ImGui::TextureBgfx tex = bx::bitCast<ImGui::TextureBgfx>(texId);
+
+                    state |= 0 != (IMGUI_FLAGS_ALPHA_BLEND & tex.flags)
                         ? BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA)
                         : BGFX_STATE_NONE
                         ;
-                    th = texture.s.handle;
-                    if (0 != texture.s.mip)
+                    th = tex.handle;
+
+                    if (0 != tex.mip)
                     {
-                        const float lodEnabled[4] = { float(texture.s.mip), 1.0f, 0.0f, 0.0f };
+                        const float lodEnabled[4] = { float(tex.mip), 1.0f, 0.0f, 0.0f };
                         bgfx::setUniform(bd->ImageLodEnabled, lodEnabled);
                         program = bd->ImageProgram;
                     }
@@ -1173,8 +1242,8 @@ void ImGui_ImplBgfx_RenderDrawData(ImDrawData* draw_data)
                 clipRect.z = (cmd->ClipRect.z - clipPos.x) * clipScale.x;
                 clipRect.w = (cmd->ClipRect.w - clipPos.y) * clipScale.y;
 
-                if (clipRect.x < fb_width
-                    && clipRect.y < fb_height
+                if (clipRect.x < dispWidth
+                    && clipRect.y < dispHeight
                     && clipRect.z >= 0.0f
                     && clipRect.w >= 0.0f)
                 {
@@ -1281,11 +1350,15 @@ namespace ImGui
 {
     inline ImTextureID toId(bgfx::TextureHandle _handle, uint8_t _flags, uint8_t _mip)
     {
-        union { struct { bgfx::TextureHandle handle; uint8_t flags; uint8_t mip; } s; ImTextureID id; } tex;
-        tex.s.handle = _handle;
-        tex.s.flags = _flags;
-        tex.s.mip = _mip;
-        return tex.id;
+        TextureBgfx tex
+        {
+            .handle = _handle,
+            .flags = _flags,
+            .mip = _mip,
+            .unused = 0,
+        };
+
+        return bx::bitCast<ImTextureID>(tex);
     }
 
     void Image(bgfx::TextureHandle handle, const ImVec2& size, const ImVec2& uv0, const ImVec2& uv1, const ImVec4& tintCol, const ImVec4& borderCol)
